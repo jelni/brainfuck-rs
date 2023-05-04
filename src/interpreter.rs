@@ -1,17 +1,22 @@
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
+use std::slice;
 
 use crate::parser::Token;
 
-pub struct Interpreter {
+pub struct Interpreter<'a> {
     data: Vec<u8>,
     data_pointer: usize,
+    input: Box<dyn Read + 'a>,
+    output: Box<dyn Write + 'a>,
 }
 
-impl Interpreter {
-    pub fn new() -> Self {
+impl<'a> Interpreter<'a> {
+    pub fn new(input: impl Read + 'a, output: impl Write + 'a) -> Self {
         Self {
             data: vec![0],
             data_pointer: 0,
+            input: Box::new(input),
+            output: Box::new(output),
         }
     }
 
@@ -33,10 +38,14 @@ impl Interpreter {
             Token::IncrementByte => self.set_value(self.get_value().wrapping_add(1)),
             Token::DecrementByte => self.set_value(self.get_value().wrapping_sub(1)),
             Token::WriteByte => {
-                print!("{}", char::from(self.get_value()));
-                io::stdout().flush().unwrap();
+                self.output.write_all(&[self.get_value()]).unwrap();
+                self.output.flush().unwrap();
             }
-            Token::ReadByte => self.set_value(io::stdin().bytes().next().unwrap().unwrap()),
+            Token::ReadByte => {
+                let mut byte = 0;
+                self.input.read_exact(slice::from_mut(&mut byte)).unwrap();
+                self.set_value(byte);
+            }
             Token::Loop(code) => {
                 while self.get_value() != 0 {
                     self.interpret(code);
