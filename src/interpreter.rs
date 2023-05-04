@@ -28,15 +28,17 @@ impl<'a> Interpreter<'a> {
 
     fn evaluate(&mut self, instruction: &Token) {
         match instruction {
-            Token::IncrementDataPointer => {
-                self.data_pointer += 1;
-                if self.data_pointer >= self.data.len() {
+            Token::ModifyDataPointer(i) => {
+                let current: i32 = self.data_pointer.try_into().unwrap();
+                self.data_pointer = current.wrapping_add(*i).try_into().unwrap();
+                while self.data_pointer >= self.data.len() {
                     self.data.push(0);
                 }
             }
-            Token::DecrementDataPointer => self.data_pointer -= 1,
-            Token::IncrementByte => self.set_value(self.get_value().wrapping_add(1)),
-            Token::DecrementByte => self.set_value(self.get_value().wrapping_sub(1)),
+            Token::ModifyByte(i) => {
+                let current: i32 = self.get_value().into();
+                self.set_value((current.wrapping_add(*i) % 256).try_into().unwrap());
+            }
             Token::WriteByte => {
                 self.output.write_all(&[self.get_value()]).unwrap();
                 self.output.flush().unwrap();
@@ -74,16 +76,13 @@ mod test {
     fn test_interpreter() {
         let mut output = Vec::new();
         Interpreter::new(Cursor::new(b"1234"), &mut output).interpret(&[
-            Token::IncrementByte,
-            Token::IncrementByte,
-            Token::IncrementByte,
-            Token::IncrementByte,
+            Token::ModifyByte(4),
             Token::Loop(vec![
-                Token::IncrementDataPointer,
+                Token::ModifyDataPointer(1),
                 Token::ReadByte,
                 Token::WriteByte,
-                Token::DecrementDataPointer,
-                Token::DecrementByte,
+                Token::ModifyDataPointer(-1),
+                Token::ModifyByte(-1),
             ]),
         ]);
         assert_eq!(output, b"1234");
