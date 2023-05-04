@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     IncrementDataPointer,
     DecrementDataPointer,
@@ -10,20 +10,20 @@ pub enum Token {
 }
 
 pub fn parse_code(code: &str) -> Vec<Token> {
-    let mut tokens = vec![vec![]];
+    let mut stack = vec![vec![]];
 
     for instruction in code.bytes() {
         match instruction {
-            b'>' => tokens.last_mut().unwrap().push(Token::IncrementDataPointer),
-            b'<' => tokens.last_mut().unwrap().push(Token::DecrementDataPointer),
-            b'+' => tokens.last_mut().unwrap().push(Token::IncrementByte),
-            b'-' => tokens.last_mut().unwrap().push(Token::DecrementByte),
-            b'.' => tokens.last_mut().unwrap().push(Token::WriteByte),
-            b',' => tokens.last_mut().unwrap().push(Token::ReadByte),
-            b'[' => tokens.push(Vec::new()),
+            b'>' => stack.last_mut().unwrap().push(Token::IncrementDataPointer),
+            b'<' => stack.last_mut().unwrap().push(Token::DecrementDataPointer),
+            b'+' => stack.last_mut().unwrap().push(Token::IncrementByte),
+            b'-' => stack.last_mut().unwrap().push(Token::DecrementByte),
+            b'.' => stack.last_mut().unwrap().push(Token::WriteByte),
+            b',' => stack.last_mut().unwrap().push(Token::ReadByte),
+            b'[' => stack.push(Vec::new()),
             b']' => {
-                let inner = tokens.pop().unwrap();
-                tokens
+                let inner = stack.pop().unwrap();
+                stack
                     .last_mut()
                     .expect("unmatched `]`")
                     .push(Token::Loop(inner));
@@ -32,7 +32,29 @@ pub fn parse_code(code: &str) -> Vec<Token> {
         }
     }
 
-    assert!(tokens.len() == 1, "unmatched `[`");
+    assert!(stack.len() == 1, "unmatched `[`");
 
-    tokens.pop().unwrap()
+    stack.pop().unwrap()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parser() {
+        let code = parse_code("> < + - . , [ + ]");
+        assert_eq!(
+            code,
+            vec![
+                Token::IncrementDataPointer,
+                Token::DecrementDataPointer,
+                Token::IncrementByte,
+                Token::DecrementByte,
+                Token::WriteByte,
+                Token::ReadByte,
+                Token::Loop(vec![Token::IncrementByte])
+            ]
+        )
+    }
 }

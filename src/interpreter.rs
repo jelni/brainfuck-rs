@@ -62,3 +62,29 @@ impl<'a> Interpreter<'a> {
         self.data[self.data_pointer] = value;
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn test_interpreter() {
+        let mut output = Vec::new();
+        Interpreter::new(Cursor::new(b"1234"), &mut output).interpret(&[
+            Token::IncrementByte,
+            Token::IncrementByte,
+            Token::IncrementByte,
+            Token::IncrementByte,
+            Token::Loop(vec![
+                Token::IncrementDataPointer,
+                Token::ReadByte,
+                Token::WriteByte,
+                Token::DecrementDataPointer,
+                Token::DecrementByte,
+            ]),
+        ]);
+        assert_eq!(output, b"1234");
+    }
+}
