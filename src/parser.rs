@@ -1,7 +1,9 @@
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
-    ModifyDataPointer(i32),
-    ModifyByte(i32),
+    IncrementDataPointer(usize),
+    DecrementDataPointer(usize),
+    IncrementByte(u8),
+    DecrementByte(u8),
     WriteByte,
     ReadByte,
     Loop(Vec<Token>),
@@ -15,53 +17,57 @@ pub fn parse_code(code: &str) -> Vec<Token> {
             b'>' => {
                 let last = stack.last_mut().unwrap();
                 match last.last_mut() {
-                    Some(Token::ModifyDataPointer(ref mut i)) => {
-                        if *i == -1 {
+                    Some(Token::IncrementDataPointer(ref mut i)) => *i = i.checked_add(1).unwrap(),
+                    Some(Token::DecrementDataPointer(ref mut i)) => {
+                        if *i == 1 {
                             last.pop();
                         } else {
-                            *i += 1;
+                            *i = i.checked_add(1).unwrap();
                         }
                     }
-                    _ => last.push(Token::ModifyDataPointer(1)),
+                    _ => last.push(Token::IncrementDataPointer(1)),
                 }
             }
             b'<' => {
                 let last = stack.last_mut().unwrap();
                 match last.last_mut() {
-                    Some(Token::ModifyDataPointer(ref mut i)) => {
+                    Some(Token::IncrementDataPointer(ref mut i)) => {
                         if *i == 1 {
                             last.pop();
                         } else {
-                            *i -= 1;
+                            *i = i.checked_sub(1).unwrap();
                         }
                     }
-                    _ => last.push(Token::ModifyDataPointer(-1)),
+                    Some(Token::DecrementDataPointer(ref mut i)) => *i = i.checked_add(1).unwrap(),
+                    _ => last.push(Token::DecrementDataPointer(1)),
                 }
             }
             b'+' => {
                 let last = stack.last_mut().unwrap();
                 match last.last_mut() {
-                    Some(Token::ModifyByte(ref mut i)) => {
-                        if *i == -1 {
+                    Some(Token::IncrementByte(ref mut i)) => *i = i.wrapping_add(1),
+                    Some(Token::DecrementByte(ref mut i)) => {
+                        if *i == 1 {
                             last.pop();
                         } else {
-                            *i += 1;
+                            *i = i.wrapping_add(1);
                         }
                     }
-                    _ => last.push(Token::ModifyByte(1)),
+                    _ => last.push(Token::IncrementByte(1)),
                 }
             }
             b'-' => {
                 let last = stack.last_mut().unwrap();
                 match last.last_mut() {
-                    Some(Token::ModifyByte(ref mut i)) => {
+                    Some(Token::IncrementByte(ref mut i)) => {
                         if *i == 1 {
                             last.pop();
                         } else {
-                            *i -= 1;
+                            *i = i.wrapping_sub(1);
                         }
                     }
-                    _ => last.push(Token::ModifyByte(-1)),
+                    Some(Token::DecrementByte(ref mut i)) => *i = i.wrapping_add(1),
+                    _ => last.push(Token::DecrementByte(1)),
                 }
             }
             b'.' => stack.last_mut().unwrap().push(Token::WriteByte),
@@ -93,13 +99,13 @@ mod test {
         assert_eq!(
             code,
             &[
-                Token::ModifyDataPointer(1),
-                Token::ModifyByte(1),
-                Token::ModifyDataPointer(-1),
-                Token::ModifyByte(-1),
+                Token::IncrementDataPointer(1),
+                Token::IncrementByte(1),
+                Token::DecrementDataPointer(1),
+                Token::DecrementByte(1),
                 Token::WriteByte,
                 Token::ReadByte,
-                Token::Loop(vec![Token::ModifyByte(1)])
+                Token::Loop(vec![Token::IncrementByte(1)])
             ]
         )
     }
@@ -107,6 +113,9 @@ mod test {
     #[test]
     fn test_optimizations() {
         let code = parse_code("++++--><>++--");
-        assert_eq!(code, &[Token::ModifyByte(2), Token::ModifyDataPointer(1)]);
+        assert_eq!(
+            code,
+            &[Token::IncrementByte(2), Token::IncrementDataPointer(1)]
+        );
     }
 }
