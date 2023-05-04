@@ -65,9 +65,10 @@ impl<'a> Interpreter<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::io::Cursor;
+    use std::io::{self, Cursor};
 
     use super::*;
+    use crate::parser::parse_code;
 
     #[test]
     fn test_interpreter() {
@@ -86,5 +87,15 @@ mod test {
             ]),
         ]);
         assert_eq!(output, b"1234");
+    }
+
+    #[test]
+    fn hello_world() {
+        let mut output = Vec::new();
+        Interpreter::new(io::empty(), &mut output).interpret(&parse_code(concat!(
+            "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]",
+            ">>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+        )));
+        assert_eq!(output, b"Hello World!\n");
     }
 }
