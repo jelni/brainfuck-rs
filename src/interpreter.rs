@@ -11,12 +11,12 @@ pub struct Interpreter<'a> {
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn new(input: impl Read + 'a, output: impl Write + 'a) -> Self {
+    pub fn new(input: Box<impl Read + 'a>, output: Box<impl Write + 'a>) -> Self {
         Self {
             data: vec![0],
             data_pointer: 0,
-            input: Box::new(input),
-            output: Box::new(output),
+            input,
+            output,
         }
     }
 
@@ -75,7 +75,7 @@ mod test {
     #[test]
     fn test_interpreter() {
         let mut output = Vec::new();
-        Interpreter::new(Cursor::new(b"1234"), &mut output).interpret(&[
+        Interpreter::new(Box::new(Cursor::new(b"1234")), Box::new(&mut output)).interpret(&[
             Token::ModifyByte(4),
             Token::Loop(vec![
                 Token::ModifyDataPointer(1),
@@ -91,10 +91,12 @@ mod test {
     #[test]
     fn hello_world() {
         let mut output = Vec::new();
-        Interpreter::new(io::empty(), &mut output).interpret(&parse_code(concat!(
-            "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]",
-            ">>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
-        )));
+        Interpreter::new(Box::new(io::empty()), Box::new(&mut output)).interpret(&parse_code(
+            concat!(
+                "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]",
+                ">>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+            ),
+        ));
         assert_eq!(output, b"Hello World!\n");
     }
 }
