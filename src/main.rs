@@ -2,13 +2,21 @@
 
 use std::{env, fs, io};
 
-use interpreter::Interpreter;
+use brainfuck_rs::interpreter::{InterpretError, Interpreter};
+use brainfuck_rs::parser::{self, ParseError};
 
-mod interpreter;
-mod parser;
+#[derive(Debug)]
+enum Error {
+    Parse(ParseError),
+    Interpret(InterpretError),
+}
 
-fn main() {
+fn main() -> Result<(), Error> {
     let code = fs::read_to_string(env::args().nth(1).expect("missing filepath")).unwrap();
-    let code = parser::parse_code(&code);
-    Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout())).interpret(&code);
+    let code = parser::parse_code(&code).map_err(Error::Parse)?;
+    Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout()))
+        .interpret(&code)
+        .map_err(Error::Interpret)?;
+
+    Ok(())
 }

@@ -9,7 +9,14 @@ pub enum Token {
     Loop(Vec<Token>),
 }
 
-pub fn parse_code(code: &str) -> Vec<Token> {
+#[derive(Debug)]
+pub enum ParseError {
+    TooBigDataPointerIncrement,
+    TooBigDataPointerDecrement,
+    UnmatchedSymbol(char),
+}
+
+pub fn parse_code(code: &str) -> Result<Vec<Token>, ParseError> {
     let mut stack = vec![vec![]];
 
     for instruction in code.bytes() {
@@ -17,12 +24,16 @@ pub fn parse_code(code: &str) -> Vec<Token> {
             b'>' => {
                 let last = stack.last_mut().unwrap();
                 match last.last_mut() {
-                    Some(Token::IncrementDataPointer(ref mut i)) => *i = i.checked_add(1).unwrap(),
+                    Some(Token::IncrementDataPointer(ref mut i)) => {
+                        *i = i
+                            .checked_add(1)
+                            .ok_or(ParseError::TooBigDataPointerIncrement)?;
+                    }
                     Some(Token::DecrementDataPointer(ref mut i)) => {
                         if *i == 1 {
                             last.pop();
                         } else {
-                            *i = i.checked_add(1).unwrap();
+                            *i = i.checked_sub(1).unwrap();
                         }
                     }
                     _ => last.push(Token::IncrementDataPointer(1)),
@@ -38,7 +49,11 @@ pub fn parse_code(code: &str) -> Vec<Token> {
                             *i = i.checked_sub(1).unwrap();
                         }
                     }
-                    Some(Token::DecrementDataPointer(ref mut i)) => *i = i.checked_add(1).unwrap(),
+                    Some(Token::DecrementDataPointer(ref mut i)) => {
+                        *i = i
+                            .checked_add(1)
+                            .ok_or(ParseError::TooBigDataPointerDecrement)?;
+                    }
                     _ => last.push(Token::DecrementDataPointer(1)),
                 }
             }
@@ -50,7 +65,7 @@ pub fn parse_code(code: &str) -> Vec<Token> {
                         if *i == 1 {
                             last.pop();
                         } else {
-                            *i = i.wrapping_add(1);
+                            *i = i.wrapping_sub(1);
                         }
                     }
                     _ => last.push(Token::IncrementByte(1)),
@@ -77,16 +92,18 @@ pub fn parse_code(code: &str) -> Vec<Token> {
                 let inner = stack.pop().unwrap();
                 stack
                     .last_mut()
-                    .expect("unmatched `]`")
+                    .ok_or(ParseError::UnmatchedSymbol(']'))?
                     .push(Token::Loop(inner));
             }
             _ => (),
         }
     }
 
-    assert!(stack.len() == 1, "unmatched `[`");
+    if stack.len() != 1 {
+        return Err(ParseError::UnmatchedSymbol('['));
+    }
 
-    stack.pop().unwrap()
+    Ok(stack.pop().unwrap())
 }
 
 #[cfg(test)]
@@ -95,7 +112,7 @@ mod test {
 
     #[test]
     fn test_parser() {
-        let code = parse_code("> + < - . , [ + ]");
+        let code = parse_code("> + < - . , [ + ]").unwrap();
         assert_eq!(
             code,
             &[
@@ -112,7 +129,7 @@ mod test {
 
     #[test]
     fn test_optimizations() {
-        let code = parse_code("++++--><>++--");
+        let code = parse_code("++++--><>++--").unwrap();
         assert_eq!(
             code,
             &[Token::IncrementByte(2), Token::IncrementDataPointer(1)]
