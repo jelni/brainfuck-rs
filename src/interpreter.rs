@@ -86,6 +86,13 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
+    /// Resets internal interpreter state.
+    pub fn reset(&mut self) {
+        self.data.truncate(64);
+        self.data.fill(0);
+        self.data_pointer = 0;
+    }
+
     /// Reads the current memory position.
     fn get_value(&self) -> u8 {
         self.data[self.data_pointer]
