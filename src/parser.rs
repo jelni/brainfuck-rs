@@ -16,6 +16,13 @@ pub enum ParseError {
     UnmatchedSymbol(char),
 }
 
+/// Parses code into a token tree.
+///
+/// # Errors
+///
+/// This function will return an error if there are too many (> [`usize::MAX`])
+/// subsequent data pointer moves or the code contains invalid syntax.
+#[allow(clippy::missing_panics_doc)] // shouldn't ever panic
 pub fn parse_code(code: &str) -> Result<Vec<Token>, ParseError> {
     let mut stack = vec![vec![]];
 

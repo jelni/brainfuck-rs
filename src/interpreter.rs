@@ -16,7 +16,10 @@ pub enum InterpretError {
     WriteError(io::Error),
 }
 
+/// Holds state of the program.
 impl<'a> Interpreter<'a> {
+    /// Creates a new interpreter.
+    #[must_use]
     pub fn new(input: Box<impl Read + 'a>, output: Box<impl Write + 'a>) -> Self {
         Self {
             data: vec![0; 64],
@@ -26,6 +29,12 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    /// Evaluates a token tree.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the data pointer moves outside of
+    /// available memory or outputting data fails.
     pub fn interpret(&mut self, code: &[Token]) -> Result<(), InterpretError> {
         for token in code {
             self.evaluate(token)?;
@@ -34,6 +43,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
+    /// Evaluates a single token.
     fn evaluate(&mut self, instruction: &Token) -> Result<(), InterpretError> {
         match instruction {
             Token::IncrementDataPointer(i) => {
@@ -76,10 +86,12 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
+    /// Reads the current memory position.
     fn get_value(&self) -> u8 {
         self.data[self.data_pointer]
     }
 
+    /// Writes to the current memory position.
     fn set_value(&mut self, value: u8) {
         self.data[self.data_pointer] = value;
     }
