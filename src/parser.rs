@@ -1,3 +1,5 @@
+use crate::errors::ParseError;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     IncrementDataPointer(usize),
@@ -9,19 +11,12 @@ pub enum Token {
     Loop(Vec<Token>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum ParseError {
-    TooBigDataPointerIncrement,
-    TooBigDataPointerDecrement,
-    UnmatchedSymbol(char),
-}
-
 /// Parses code into a token tree.
 ///
 /// # Errors
 ///
 /// This function will return an error if there are too many (> [`usize::MAX`])
-/// subsequent data pointer moves or the code contains invalid syntax.
+/// subsequent data pointer moves, or the code contains invalid syntax.
 #[allow(clippy::missing_panics_doc)] // shouldn't ever panic
 pub fn parse_code(code: &str) -> Result<Vec<Token>, ParseError> {
     let mut stack = vec![vec![]];
@@ -34,7 +29,7 @@ pub fn parse_code(code: &str) -> Result<Vec<Token>, ParseError> {
                     Some(Token::IncrementDataPointer(ref mut i)) => {
                         *i = i
                             .checked_add(1)
-                            .ok_or(ParseError::TooBigDataPointerIncrement)?;
+                            .ok_or(ParseError::DataPointerIncrementOverflow)?;
                     }
                     Some(Token::DecrementDataPointer(ref mut i)) => {
                         if *i == 1 {
@@ -59,7 +54,7 @@ pub fn parse_code(code: &str) -> Result<Vec<Token>, ParseError> {
                     Some(Token::DecrementDataPointer(ref mut i)) => {
                         *i = i
                             .checked_add(1)
-                            .ok_or(ParseError::TooBigDataPointerDecrement)?;
+                            .ok_or(ParseError::DataPointerDecrementOverflow)?;
                     }
                     _ => last.push(Token::DecrementDataPointer(1)),
                 }

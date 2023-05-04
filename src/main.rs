@@ -3,39 +3,46 @@
 use std::io::Write;
 use std::{env, fs, io};
 
-use brainfuck_rs::interpreter::{InterpretError, Interpreter};
-use brainfuck_rs::parser::{self, ParseError};
+use brainfuck_rs::interpreter::Interpreter;
+use brainfuck_rs::parser;
 
-#[derive(Debug)]
-enum Error {
-    Parse(ParseError),
-    Interpret(InterpretError),
-    Io(io::Error),
-}
-
-fn main() -> Result<(), Error> {
+fn main() {
     match env::args().nth(1) {
         Some(path) => {
-            let code = fs::read_to_string(path).map_err(Error::Io)?;
-            let code = parser::parse_code(&code).map_err(Error::Parse)?;
-            Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout()))
-                .interpret(&code)
-                .map_err(Error::Interpret)?;
+            let code = match fs::read_to_string(path) {
+                Ok(code) => code,
+                Err(err) => {
+                    eprintln!("failed to read file: {err}");
+                    return;
+                }
+            };
+
+            let code = match parser::parse_code(&code) {
+                Ok(code) => code,
+                Err(err) => {
+                    eprint!("parser error: {err}");
+                    return;
+                }
+            };
+
+            if let Err(err) =
+                Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout())).interpret(&code)
+            {
+                eprintln!("interpreter error: {err}");
+            }
         }
         None => repl(),
     }
-
-    Ok(())
 }
 
 fn repl() {
-    println!("Welcome to REPL! Type \"reset\" to reset state or \"exit\" to exit.");
+    eprintln!("Welcome to REPL! Type \"reset\" to reset state or \"exit\" to exit.");
 
     let mut interpreter = Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout()));
 
     loop {
-        print!("> ");
-        io::stdout().flush().unwrap();
+        eprint!("> ");
+        io::stderr().flush().unwrap();
 
         let mut code = String::new();
         io::stdin().read_line(&mut code).unwrap();
@@ -44,22 +51,22 @@ fn repl() {
             "exit" => return,
             "reset" => {
                 interpreter.reset();
-                println!("State reset.");
+                eprintln!("state reset");
             }
             _ => (),
         }
 
-        match parser::parse_code(&code) {
-            Ok(code) => {
-                if let Err(err) = interpreter.interpret(&code) {
-                    eprintln!("{err:?}");
-                    continue;
-                }
-            }
+        let code = match parser::parse_code(&code) {
+            Ok(code) => code,
             Err(err) => {
-                eprintln!("{err:?}");
+                eprintln!("{err}");
                 continue;
             }
         };
+
+        if let Err(err) = interpreter.interpret(&code) {
+            eprintln!("{err}");
+            continue;
+        }
     }
 }

@@ -1,6 +1,7 @@
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::slice;
 
+use crate::errors::InterpretError;
 use crate::parser::Token;
 
 pub struct Interpreter<'a> {
@@ -8,12 +9,6 @@ pub struct Interpreter<'a> {
     data_pointer: usize,
     input: Box<dyn Read + 'a>,
     output: Box<dyn Write + 'a>,
-}
-
-#[derive(Debug)]
-pub enum InterpretError {
-    DataPointerOutsideMemory,
-    WriteError(io::Error),
 }
 
 /// Holds state of the program.
@@ -34,7 +29,8 @@ impl<'a> Interpreter<'a> {
     /// # Errors
     ///
     /// This function will return an error if the data pointer moves outside of
-    /// available memory or outputting data fails.
+    /// available memory, the interpreter gets stuck in an empty loop, or
+    /// outputting data fails.
     pub fn interpret(&mut self, code: &[Token]) -> Result<(), InterpretError> {
         for token in code {
             self.evaluate(token)?;
@@ -78,6 +74,10 @@ impl<'a> Interpreter<'a> {
             }
             Token::Loop(code) => {
                 while self.get_value() != 0 {
+                    if code.is_empty() {
+                        return Err(InterpretError::EmptyLoop);
+                    }
+
                     self.interpret(code)?;
                 }
             }
