@@ -9,7 +9,7 @@ pub enum Token {
     Loop(Vec<Token>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     TooBigDataPointerIncrement,
     TooBigDataPointerDecrement,
@@ -129,10 +129,38 @@ mod test {
 
     #[test]
     fn test_optimizations() {
-        let code = parse_code("++++--><>++--").unwrap();
+        let code = parse_code(">><< ++-- <<>> --++").unwrap();
+        assert_eq!(code, &[]);
+
+        let code = parse_code(">>>< +++- <<<> ---+").unwrap();
         assert_eq!(
             code,
-            &[Token::IncrementByte(2), Token::IncrementDataPointer(1)]
+            &[
+                Token::IncrementDataPointer(2),
+                Token::IncrementByte(2),
+                Token::DecrementDataPointer(2),
+                Token::DecrementByte(2)
+            ]
         );
+
+        let code = parse_code("><<< +--- <>>> -+++").unwrap();
+        assert_eq!(
+            code,
+            &[
+                Token::DecrementDataPointer(2),
+                Token::DecrementByte(2),
+                Token::IncrementDataPointer(2),
+                Token::IncrementByte(2)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_errors() {
+        let err = parse_code("[+][").unwrap_err();
+        assert_eq!(err, ParseError::UnmatchedSymbol('['));
+
+        let err = parse_code("[+]]").unwrap_err();
+        assert_eq!(err, ParseError::UnmatchedSymbol(']'));
     }
 }

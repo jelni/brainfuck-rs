@@ -156,4 +156,17 @@ mod test {
             .unwrap();
         assert_eq!(output, b"H\n");
     }
+
+    #[test]
+    fn test_errors() {
+        let mut interpreter = Interpreter::new(Box::new(io::empty()), Box::new(Vec::new()));
+
+        let err = interpreter
+            .interpret(&[Token::DecrementDataPointer(1)])
+            .unwrap_err();
+
+        let InterpretError::DataPointerOutsideMemory = err else {
+            panic!();
+        };
+    }
 }
