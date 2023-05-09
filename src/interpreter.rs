@@ -1,26 +1,31 @@
 use std::io::{Read, Write};
-use std::slice;
+use std::{fmt, slice};
 
 use crate::errors::InterpretError;
 use crate::parser::Token;
 
+/// Holds interpreter state.
 pub struct Interpreter<'a> {
     data: Vec<u8>,
     data_pointer: usize,
     input: Box<dyn Read + 'a>,
     output: Box<dyn Write + 'a>,
+    instruction_count: u64,
 }
 
-/// Holds state of the program.
 impl<'a> Interpreter<'a> {
     /// Creates a new interpreter.
     #[must_use]
     pub fn new(input: Box<impl Read + 'a>, output: Box<impl Write + 'a>) -> Self {
+        let mut data = Vec::with_capacity(64);
+        data.push(0);
+
         Self {
-            data: vec![0; 64],
+            data,
             data_pointer: 0,
             input,
             output,
+            instruction_count: 0,
         }
     }
 
@@ -48,6 +53,8 @@ impl<'a> Interpreter<'a> {
                     .checked_add(*i)
                     .ok_or(InterpretError::DataPointerOutsideMemory)?;
 
+                self.instruction_count += u64::try_from(*i).unwrap();
+
                 while self.data_pointer >= self.data.len() {
                     self.data.push(0);
                 }
@@ -57,20 +64,32 @@ impl<'a> Interpreter<'a> {
                     .data_pointer
                     .checked_sub(*i)
                     .ok_or(InterpretError::DataPointerOutsideMemory)?;
+
+                self.instruction_count += u64::try_from(*i).unwrap();
             }
-            Token::IncrementByte(i) => self.set_value(self.get_value().wrapping_add(*i)),
-            Token::DecrementByte(i) => self.set_value(self.get_value().wrapping_sub(*i)),
+            Token::IncrementByte(i) => {
+                self.set_value(self.get_value().wrapping_add(*i));
+                self.instruction_count += u64::from(*i);
+            }
+            Token::DecrementByte(i) => {
+                self.set_value(self.get_value().wrapping_sub(*i));
+                self.instruction_count += u64::from(*i);
+            }
             Token::WriteByte => {
                 self.output
                     .write_all(&[self.get_value()])
                     .map_err(InterpretError::WriteError)?;
                 self.output.flush().map_err(InterpretError::WriteError)?;
+                self.instruction_count += 1;
             }
             Token::ReadByte => {
                 let mut byte = 0;
+
                 if self.input.read_exact(slice::from_mut(&mut byte)).is_ok() {
                     self.set_value(byte);
                 }
+
+                self.instruction_count += 1;
             }
             Token::Loop(code) => {
                 while self.get_value() != 0 {
@@ -86,11 +105,21 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
+    /// Returns current interpreter stats.
+    #[must_use]
+    pub fn stats(&self) -> InterpretStats {
+        InterpretStats {
+            instruction_count: self.instruction_count,
+            used_memory: self.data.len(),
+        }
+    }
+
     /// Resets internal interpreter state.
     pub fn reset(&mut self) {
-        self.data.truncate(64);
-        self.data.fill(0);
         self.data_pointer = 0;
+        self.data.clear();
+        self.data.push(0);
+        self.instruction_count = 0;
     }
 
     /// Reads the current memory position.
@@ -101,6 +130,22 @@ impl<'a> Interpreter<'a> {
     /// Writes to the current memory position.
     fn set_value(&mut self, value: u8) {
         self.data[self.data_pointer] = value;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct InterpretStats {
+    pub instruction_count: u64,
+    pub used_memory: usize,
+}
+
+impl fmt::Display for InterpretStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "instruction count: {}, used memory: {}",
+            self.instruction_count, self.used_memory
+        )
     }
 }
 
@@ -126,7 +171,27 @@ mod test {
                 ]),
             ])
             .unwrap();
+
         assert_eq!(output, b"1234");
+    }
+
+    #[test]
+    fn test_stats() {
+        let mut interpreter = Interpreter::new(Box::new(io::empty()), Box::new(Vec::new()));
+        interpreter
+            .interpret(&[
+                Token::IncrementDataPointer(64),
+                Token::IncrementByte(128),
+                Token::Loop(vec![Token::DecrementByte(1)]),
+            ])
+            .unwrap();
+        assert_eq!(
+            interpreter.stats(),
+            InterpretStats {
+                instruction_count: 320,
+                used_memory: 65
+            }
+        );
     }
 
     #[test]

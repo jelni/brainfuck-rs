@@ -25,18 +25,21 @@ fn main() {
                 }
             };
 
-            if let Err(err) =
-                Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout())).interpret(&code)
-            {
+            let mut interpreter = Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout()));
+
+            if let Err(err) = interpreter.interpret(&code) {
                 eprintln!("interpreter error: {err}");
+                return;
             }
+
+            eprintln!("{}", interpreter.stats());
         }
         None => repl(),
     }
 }
 
 fn repl() {
-    eprintln!("Welcome to REPL! Type \"reset\" to reset state or \"exit\" to exit.");
+    eprintln!("Welcome to REPL! Available commands: \"stats\", \"reset\", \"exit\".");
 
     let mut interpreter = Interpreter::new(Box::new(io::stdin()), Box::new(io::stdout()));
 
@@ -53,6 +56,7 @@ fn repl() {
                 interpreter.reset();
                 eprintln!("state reset");
             }
+            "stats" => eprintln!("{}", interpreter.stats()),
             _ => (),
         }
 
